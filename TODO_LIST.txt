@@ -1,2 +1,4 @@
+It still has multiple of the same actor name somehow in the log
+
 Fix failing CAF tests
 

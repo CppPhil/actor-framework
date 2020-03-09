@@ -420,13 +420,15 @@ class monitor {
   decltype(auto) do_it(Invocable&& invocable) {
     std::lock_guard<std::mutex> lock_guard(mutex_);
     (void) lock_guard;
-    return std::invoke(std::forward<Invocable>(invocable), data_,
+    return std::invoke(std::forward<Invocable>(invocable), data_, name_,
                        vector_timestamp_);
   }
 
 public:
   std::vector<size_t> accept(logger_id&& lid) {
-    return do_it([lid = std::move(lid)](auto& data, auto& vstamp) {
+    return do_it([lid = std::move(lid)](auto& data,
+                                        [[maybe_unused]] const auto& name,
+                                        auto& vstamp) {
       auto it = data.find(lid);
 
       if (it == data.end()) {
@@ -445,17 +447,24 @@ public:
 
   std::vector<size_t> get() const {
     return const_cast<monitor*>(this)->do_it(
-      []([[maybe_unused]] const auto& data, const auto& vstamp) { return vstamp; });
+      []([[maybe_unused]] const auto& data, [[maybe_unused]] const auto& name,
+         const auto& vstamp) { return vstamp; });
+  }
+
+  std::string name(size_t vid) const {
+    return const_cast<monitor*>(this)->do_it(
+      [vid]([[maybe_unused]] const auto& data, const auto& name,
+            [[maybe_unused]] const auto& vstamp) { return name.at(vid); });
   }
 
 private:
   std::map<logger_id, size_t> data_;
+  std::vector<std::string> name_;
   std::vector<size_t> vector_timestamp_;
   std::mutex mutex_;
 } monitor_instance;
 
-std::string json_vector_timestamp(const std::vector<size_t>& vstamp,
-                                  caf::actor_id aid) {
+std::string json_vector_timestamp(const std::vector<size_t>& vstamp) {
   // create ShiViz compatible JSON-formatted vector timestamp
   std::ostringstream oss;
   oss << '{';
@@ -468,7 +477,7 @@ std::string json_vector_timestamp(const std::vector<size_t>& vstamp,
         oss << ',';
       else
         need_comma = true;
-      oss << '"' << "actor" << aid << '"' << ':' << x;
+      oss << '"' << "actor" << monitor_instance.name(i) << '"' << ':' << x;
     }
   }
 
@@ -486,7 +495,7 @@ void logger::render(std::ostream& out, const line_format& lf,
   };
 
   const auto vstamp = monitor_instance.accept({x.aid, x.tid});
-  out << json_vector_timestamp(vstamp, x.aid) << ' ';
+  out << json_vector_timestamp(vstamp) << ' ';
 
   // clang-format off
   for (auto& f : lf)

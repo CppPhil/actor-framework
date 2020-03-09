@@ -426,15 +426,14 @@ class monitor {
 
 public:
   std::vector<size_t> accept(logger_id&& lid) {
-    return do_it([lid = std::move(lid)](auto& data,
-                                        [[maybe_unused]] const auto& name,
-                                        auto& vstamp) {
+    return do_it([lid = std::move(lid)](auto& data, auto& name, auto& vstamp) {
       auto it = data.find(lid);
 
       if (it == data.end()) {
         vstamp.push_back(0);
         auto [iter, always_true] = data.emplace(std::move(lid),
                                                 vstamp.size() - 1);
+        name.push_back("actor" + std::to_string(lid.aid));
         it = iter;
       }
 

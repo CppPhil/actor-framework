@@ -424,77 +424,38 @@ class monitor {
                        vector_timestamp_);
   }
 
-  struct logger_data {
-    size_t vid;
-    std::string name;
-  };
-
 public:
-  std::vector<size_t> accept(const logger_id& lid, std::string&& name) {
-    return do_it([&lid, name = std::move(name)](auto& data, auto& vstamp) {
+  std::vector<size_t> accept(logger_id&& lid) {
+    return do_it([lid = std::move(lid)](auto& data, auto& vstamp) {
       auto it = data.find(lid);
 
       if (it == data.end()) {
         vstamp.push_back(0);
-        auto [iter, always_true]
-          = data.emplace(lid, logger_data{vstamp.size() - 1, std::move(name)});
+        auto [iter, always_true] = data.emplace(std::move(lid),
+                                                vstamp.size() - 1);
         it = iter;
       }
 
-      auto& [logger_id, logger_data] = *it;
-      auto& [vid, name] = logger_data;
+      auto& [logger_id, vid] = *it;
       ++vstamp.at(vid);
 
       return vstamp;
     });
   }
 
-  std::string name(const logger_id& lid) const {
-    return const_cast<monitor*>(this)->do_it(
-      [&lid](const auto& data, [[maybe_unused]] const auto& vstamp) {
-        if (auto it = data.find(lid); it != data.end()) {
-          const auto& [log_id, logger_data] = *it;
-          const auto& [vid, name] = logger_data;
-          return name;
-        } else
-          return std::string();
-      });
-  }
-
   std::vector<size_t> get() const {
     return const_cast<monitor*>(this)->do_it(
-      []([[maybe_unused]] const auto& data, const auto& vstamp) {
-        return vstamp;
-      });
+      []([[maybe_unused]] const auto& data, const auto& vstamp) { return vstamp; });
   }
 
 private:
-  std::map<logger_id, logger_data> data_;
+  std::map<logger_id, size_t> data_;
   std::vector<size_t> vector_timestamp_;
   std::mutex mutex_;
 } monitor_instance;
 
-auto find_plain_text_field(const logger::line_format& lf) {
-  return std::find_if(lf.begin(), lf.end(), [](const auto& f) {
-    return f.kind == logger::plain_text_field;
-  });
-}
-
-std::string name(const logger::line_format& lf, const logger::event& x) {
-  if (auto it = find_plain_text_field(lf); it != lf.end()) {
-    const auto& field = *it;
-
-    constexpr caf::string_view start = "INIT ; NAME = ";
-
-    if (caf::starts_with(field.text, start))
-      return field.text.substr(start.size());
-  }
-
-  return "actor" + std::to_string(x.aid);
-}
-
 std::string json_vector_timestamp(const std::vector<size_t>& vstamp,
-                                  caf::string_view name) {
+                                  caf::actor_id aid) {
   // create ShiViz compatible JSON-formatted vector timestamp
   std::ostringstream oss;
   oss << '{';
@@ -507,7 +468,7 @@ std::string json_vector_timestamp(const std::vector<size_t>& vstamp,
         oss << ',';
       else
         need_comma = true;
-      oss << '"' << name << '"' << ':' << x;
+      oss << '"' << "actor" << aid << '"' << ':' << x;
     }
   }
 
@@ -524,9 +485,8 @@ void logger::render(std::ostream& out, const line_format& lf,
     return duration_cast<milliseconds>(tn - t0).count();
   };
 
-  const logger_id lid{x.aid, x.tid};
-  const auto vstamp = monitor_instance.accept(lid, name(lf, x));
-  out << json_vector_timestamp(vstamp, monitor_instance.name(lid)) << ' ';
+  const auto vstamp = monitor_instance.accept({x.aid, x.tid});
+  out << json_vector_timestamp(vstamp, x.aid);
 
   // clang-format off
   for (auto& f : lf)

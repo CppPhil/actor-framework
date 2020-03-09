@@ -23,6 +23,7 @@
 #include <cstring>
 #include <ctime>
 #include <fstream>
+#include <functional>
 #include <iomanip>
 #include <thread>
 #include <unordered_map>
@@ -55,36 +56,18 @@ thread_local actor_id current_actor_id;
 thread_local intrusive_ptr<logger> current_logger_ptr;
 
 constexpr string_view log_level_name[] = {
-  "QUIET",
-  "",
-  "",
-  "ERROR",
-  "",
-  "",
-  "WARN",
-  "",
-  "",
-  "INFO",
-  "",
-  "",
-  "DEBUG",
-  "",
-  "",
-  "TRACE",
+  "QUIET", "",     "", "ERROR", "",      "", "WARN", "",
+  "",      "INFO", "", "",      "DEBUG", "", "",     "TRACE",
 };
 
 constexpr string_view fun_prefixes[] = {
-  "virtual ",
-  "static ",
-  "const ",
-  "signed ",
-  "unsigned ",
+  "virtual ", "static ", "const ", "signed ", "unsigned ",
 };
 
 // Various spellings of the anonymous namespace as reported by CAF_PRETTY_FUN.
 constexpr string_view anon_ns[] = {
   "(anonymous namespace)", // Clang
-  "{anonymous}", // GCC
+  "{anonymous}",           // GCC
   "`anonymous-namespace'", // MSVC
 };
 
@@ -193,11 +176,11 @@ string_view reduce_symbol(std::ostream& out, string_view symbol) {
 } // namespace
 
 logger::config::config()
-    : verbosity(CAF_LOG_LEVEL),
-      file_verbosity(CAF_LOG_LEVEL),
-      console_verbosity(CAF_LOG_LEVEL),
-      inline_output(false),
-      console_coloring(false) {
+  : verbosity(CAF_LOG_LEVEL),
+    file_verbosity(CAF_LOG_LEVEL),
+    console_verbosity(CAF_LOG_LEVEL),
+    inline_output(false),
+    console_coloring(false) {
   // nop
 }
 
@@ -222,8 +205,8 @@ logger::line_builder::line_builder() {
   // nop
 }
 
-logger::line_builder& logger::line_builder::
-operator<<(const local_actor* self) {
+logger::line_builder&
+logger::line_builder::operator<<(const local_actor* self) {
   return *this << self->name();
 }
 
@@ -332,10 +315,10 @@ void logger::init(actor_system_config& cfg) {
   cfg_.console_verbosity = to_level_int(console_str);
   cfg_.verbosity = std::max(cfg_.file_verbosity, cfg_.console_verbosity);
   // Parse the format string.
-  file_format_ =
-    parse_format(get_or(cfg, "logger.file-format", lg::file_format));
-  console_format_ = parse_format(get_or(cfg,"logger.console-format",
-                                        lg::console_format));
+  file_format_
+    = parse_format(get_or(cfg, "logger.file-format", lg::file_format));
+  console_format_
+    = parse_format(get_or(cfg, "logger.console-format", lg::console_format));
   // Set flags.
   if (get_or(cfg, "logger.inline-output", false))
     cfg_.inline_output = true;
@@ -422,12 +405,89 @@ void logger::render_date(std::ostream& out, timestamp x) {
   out << deep_to_string(x);
 }
 
+namespace {
+struct logger_id {
+  actor_id aid;
+  std::thread::id tid;
+
+  friend bool operator<(const logger_id& x, const logger_id& y) noexcept {
+    return x.aid == 0 && y.aid == 0 ? x.tid < y.tid : x.aid < y.aid;
+  }
+};
+
+class monitor {
+  template <class Invocable>
+  decltype(auto) do_it(Invocable&& invocable) {
+    std::lock_guard<std::mutex> lock_guard(mutex_);
+    (void) lock_guard;
+    return std::invoke(std::forward<Invocable>(invocable), data_,
+                       vector_timestamp_);
+  }
+
+public:
+  std::vector<size_t> accept(logger_id&& lid) {
+    return do_it([lid = std::move(lid)](auto& data, auto& vstamp) {
+      auto it = data.find(lid);
+
+      if (it == data.end()) {
+        vstamp.push_back(0);
+        auto [iter, always_true] = data.emplace(std::move(lid),
+                                                vstamp.size() - 1);
+        it = iter;
+      }
+
+      auto& [logger_id, vid] = *it;
+      ++vstamp.at(vid);
+
+      return vstamp;
+    });
+  }
+
+  std::vector<size_t> get() const {
+    return const_cast<monitor*>(this)->do_it(
+      []([[maybe_unused]] const auto& data, const auto& vstamp) { return vstamp; });
+  }
+
+private:
+  std::map<logger_id, size_t> data_;
+  std::vector<size_t> vector_timestamp_;
+  std::mutex mutex_;
+} monitor_instance;
+
+std::string json_vector_timestamp(const std::vector<size_t>& vstamp,
+                                  caf::actor_id aid) {
+  // create ShiViz compatible JSON-formatted vector timestamp
+  std::ostringstream oss;
+  oss << '{';
+  bool need_comma = false;
+
+  for (size_t i = 0; i < vstamp.size(); ++i) {
+    auto x = vstamp[i];
+    if (x > 0) {
+      if (need_comma)
+        oss << ',';
+      else
+        need_comma = true;
+      oss << '"' << "actor" << aid << '"' << ':' << x;
+    }
+  }
+
+  oss << '}';
+  return oss.str();
+}
+} // namespace
+
+// TODO: HERE: The log entry is actually written here.
 void logger::render(std::ostream& out, const line_format& lf,
                     const event& x) const {
   auto ms_time_diff = [](timestamp t0, timestamp tn) {
     using namespace std::chrono;
     return duration_cast<milliseconds>(tn - t0).count();
   };
+
+  const auto vstamp = monitor_instance.accept({x.aid, x.tid});
+  out << json_vector_timestamp(vstamp, x.aid);
+
   // clang-format off
   for (auto& f : lf)
     switch (f.kind) {
@@ -486,8 +546,8 @@ logger::line_format logger::parse_format(const std::string& format_str) {
     } else {
       if (*i == '%') {
         if (plain_text_first != i)
-          res.emplace_back(field{plain_text_field,
-                                 std::string{plain_text_first, i}});
+          res.emplace_back(
+            field{plain_text_field, std::string{plain_text_first, i}});
         read_percent_sign = true;
       }
     }
@@ -600,7 +660,7 @@ void logger::start() {
   if (verbosity() == CAF_LOG_LEVEL_QUIET)
     return;
   file_name_ = get_or(system_.config(), "logger.file-name",
-                  defaults::logger::file_name);
+                      defaults::logger::file_name);
   if (file_name_.empty()) {
     // No need to continue if console and log file are disabled.
     if (console_verbosity() == CAF_LOG_LEVEL_QUIET)
@@ -656,10 +716,10 @@ void logger::stop() {
 }
 
 std::string to_string(logger::field_type x) {
-  static constexpr const char* names[] = {
-    "invalid", "category", "class_name", "date",         "file",
-    "line",    "message",  "method",     "newline",      "priority",
-    "runtime", "thread",   "actor",      "percent_sign", "plain_text"};
+  static constexpr const char* names[]
+    = {"invalid", "category", "class_name", "date",         "file",
+       "line",    "message",  "method",     "newline",      "priority",
+       "runtime", "thread",   "actor",      "percent_sign", "plain_text"};
   return names[static_cast<size_t>(x)];
 }
 

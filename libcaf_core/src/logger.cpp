@@ -431,9 +431,9 @@ public:
 
       if (it == data.end()) {
         vstamp.push_back(0);
+        name.push_back("actor" + std::to_string(lid.aid));
         auto [iter, always_true] = data.emplace(std::move(lid),
                                                 vstamp.size() - 1);
-        name.push_back("actor" + std::to_string(lid.aid));
         it = iter;
       }
 

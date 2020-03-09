@@ -476,7 +476,7 @@ std::string json_vector_timestamp(const std::vector<size_t>& vstamp) {
         oss << ',';
       else
         need_comma = true;
-      oss << '"' << "actor" << monitor_instance.name(i) << '"' << ':' << x;
+      oss << '"' << monitor_instance.name(i) << '"' << ':' << x;
     }
   }
 

@@ -486,7 +486,7 @@ void logger::render(std::ostream& out, const line_format& lf,
   };
 
   const auto vstamp = monitor_instance.accept({x.aid, x.tid});
-  out << json_vector_timestamp(vstamp, x.aid);
+  out << json_vector_timestamp(vstamp, x.aid) << ' ';
 
   // clang-format off
   for (auto& f : lf)

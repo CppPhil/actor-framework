@@ -18,6 +18,8 @@
 
 #include "caf/logger.hpp"
 
+#include <cassert>
+
 #include <algorithm>
 #include <condition_variable>
 #include <cstring>
@@ -425,7 +427,7 @@ class monitor {
   }
 
 public:
-  std::vector<size_t> accept(logger_id&& lid) {
+  std::vector<size_t> accept(logger_id lid) {
     return do_it([lid = std::move(lid)](auto& data, auto& name, auto& vstamp,
                                         auto& thread_count) {
       auto it = data.find(lid);
@@ -448,6 +450,18 @@ public:
 
       return vstamp;
     });
+  }
+
+  size_t vid(logger_id lid) const {
+    return const_cast<monitor*>(this)->do_it(
+      [&lid](const auto& data, [[maybe_unused]] const auto& name,
+             [[maybe_unused]] const auto& vstamp,
+             [[maybe_unused]] const auto& thread_count) {
+        auto it = data.find(lid);
+        assert(it != data.end());
+        const auto& [logger_id, vid] = *it;
+        return vid;
+      });
   }
 
   std::vector<size_t> get() const {
@@ -505,7 +519,10 @@ void logger::render(std::ostream& out, const line_format& lf,
     return duration_cast<milliseconds>(tn - t0).count();
   };
 
-  const auto vstamp = monitor_instance.accept({x.aid, x.tid});
+  const logger_id lid = {x.aid, x.tid};
+  const auto vstamp = monitor_instance.accept(lid);
+  const auto vid = monitor_instance.vid(lid);
+  const auto actor_name = monitor_instance.name(vid);
   out << json_vector_timestamp(vstamp) << ' ';
 
   // clang-format off
@@ -522,7 +539,7 @@ void logger::render(std::ostream& out, const line_format& lf,
       case priority_field:     out << log_level_name[x.level];     break;
       case runtime_field:      out << ms_time_diff(t0_, x.tstamp); break;
       case thread_field:       out << x.tid;                       break;
-      case actor_field:        out << "actor" << x.aid;            break;
+      case actor_field:        out << actor_name;                  break;
       case percent_sign_field: out << '%';                         break;
       case plain_text_field:   out << f.text;                      break;
       default: ; // nop

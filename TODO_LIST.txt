@@ -1,4 +1,5 @@
-It still has multiple of the same actor name somehow in the log
+Make it more like the custom_caf-vec application.
+Make it so that ShiViz accepts the log files generated.
 
 Fix failing CAF tests
 

@@ -493,7 +493,8 @@ void logger::render(std::ostream& out, const line_format& lf,
     return duration_cast<milliseconds>(tn - t0).count();
   };
 
-  const auto vstamp = monitor_instance.accept({x.aid, x.tid});
+  const logger_id lid(x.aid, x.tid);
+  const auto vstamp = monitor_instance.accept(lid);
   out << json_vector_timestamp(vstamp) << ' ';
 
   // clang-format off

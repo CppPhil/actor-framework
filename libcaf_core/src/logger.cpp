@@ -421,17 +421,23 @@ class monitor {
     std::lock_guard<std::mutex> lock_guard(mutex_);
     (void) lock_guard;
     return std::invoke(std::forward<Invocable>(invocable), data_, name_,
-                       vector_timestamp_);
+                       vector_timestamp_, thread_count_);
   }
 
 public:
   std::vector<size_t> accept(logger_id&& lid) {
-    return do_it([lid = std::move(lid)](auto& data, auto& name, auto& vstamp) {
+    return do_it([lid = std::move(lid)](auto& data, auto& name, auto& vstamp,
+                                        auto& thread_count) {
       auto it = data.find(lid);
 
       if (it == data.end()) {
         vstamp.push_back(0);
-        name.push_back("actor" + std::to_string(lid.aid));
+
+        if (lid.aid == 0)
+          name.push_back("thread" + std::to_string(++thread_count));
+        else
+          name.push_back("actor" + std::to_string(lid.aid));
+
         auto [iter, always_true] = data.emplace(std::move(lid),
                                                 vstamp.size() - 1);
         it = iter;
@@ -447,19 +453,24 @@ public:
   std::vector<size_t> get() const {
     return const_cast<monitor*>(this)->do_it(
       []([[maybe_unused]] const auto& data, [[maybe_unused]] const auto& name,
-         const auto& vstamp) { return vstamp; });
+         const auto& vstamp,
+         [[maybe_unused]] const auto& thread_count) { return vstamp; });
   }
 
   std::string name(size_t vid) const {
     return const_cast<monitor*>(this)->do_it(
       [vid]([[maybe_unused]] const auto& data, const auto& name,
-            [[maybe_unused]] const auto& vstamp) { return name.at(vid); });
+            [[maybe_unused]] const auto& vstamp,
+            [[maybe_unused]] const auto& thread_count) {
+        return name.at(vid);
+      });
   }
 
 private:
   std::map<logger_id, size_t> data_;
   std::vector<std::string> name_;
   std::vector<size_t> vector_timestamp_;
+  size_t thread_count_ = 0;
   std::mutex mutex_;
 } monitor_instance;
 

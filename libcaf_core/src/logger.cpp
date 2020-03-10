@@ -463,6 +463,7 @@ private:
   std::mutex mutex_;
 } monitor_instance;
 
+// TODO: The name is somehow not correct.
 std::string json_vector_timestamp(const std::vector<size_t>& vstamp) {
   // create ShiViz compatible JSON-formatted vector timestamp
   std::ostringstream oss;

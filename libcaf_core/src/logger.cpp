@@ -426,6 +426,14 @@ class monitor {
                        vector_timestamp_, thread_count_);
   }
 
+  template <class Invocable>
+  decltype(auto) do_it(Invocable&& invocable) const {
+    std::lock_guard<std::mutex> lock_guard(mutex_);
+    (void) lock_guard;
+    return std::invoke(std::forward<Invocable>(invocable), data_, name_,
+                       vector_timestamp_, thread_count_);
+  }
+
 public:
   std::vector<size_t> accept(logger_id lid) {
     return do_it([lid = std::move(lid)](auto& data, auto& name, auto& vstamp,
@@ -453,31 +461,29 @@ public:
   }
 
   size_t vid(logger_id lid) const {
-    return const_cast<monitor*>(this)->do_it(
-      [&lid](const auto& data, [[maybe_unused]] const auto& name,
-             [[maybe_unused]] const auto& vstamp,
-             [[maybe_unused]] const auto& thread_count) {
-        auto it = data.find(lid);
-        assert(it != data.end());
-        const auto& [logger_id, vid] = *it;
-        return vid;
-      });
+    return do_it([&lid](const auto& data, [[maybe_unused]] const auto& name,
+                        [[maybe_unused]] const auto& vstamp,
+                        [[maybe_unused]] const auto& thread_count) {
+      auto it = data.find(lid);
+      assert(it != data.end());
+      const auto& [logger_id, vid] = *it;
+      return vid;
+    });
   }
 
   std::vector<size_t> get() const {
-    return const_cast<monitor*>(this)->do_it(
+    return do_it(
       []([[maybe_unused]] const auto& data, [[maybe_unused]] const auto& name,
          const auto& vstamp,
          [[maybe_unused]] const auto& thread_count) { return vstamp; });
   }
 
   std::string name(size_t vid) const {
-    return const_cast<monitor*>(this)->do_it(
-      [vid]([[maybe_unused]] const auto& data, const auto& name,
-            [[maybe_unused]] const auto& vstamp,
-            [[maybe_unused]] const auto& thread_count) {
-        return name.at(vid);
-      });
+    return do_it([vid]([[maybe_unused]] const auto& data, const auto& name,
+                       [[maybe_unused]] const auto& vstamp,
+                       [[maybe_unused]] const auto& thread_count) {
+      return name.at(vid);
+    });
   }
 
 private:
@@ -485,10 +491,9 @@ private:
   std::vector<std::string> name_;
   std::vector<size_t> vector_timestamp_;
   size_t thread_count_ = 0;
-  std::mutex mutex_;
+  mutable std::mutex mutex_;
 } monitor_instance;
 
-// TODO: The name is incorrect somehow.
 std::string json_vector_timestamp(const std::vector<size_t>& vstamp) {
   // create ShiViz compatible JSON-formatted vector timestamp
   std::ostringstream oss;

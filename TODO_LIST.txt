@@ -1,5 +1,4 @@
-After the actor name e.g. actor1 or thread1 it prints
-some weirdf number.
+Only include the requiered entries in the vector timestamp
 
 Make it more like the custom_caf-vec application.
 Make it so that ShiViz accepts the log files generated.

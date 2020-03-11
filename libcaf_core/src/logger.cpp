@@ -533,34 +533,20 @@ void logger::render(std::ostream& out, const line_format& lf,
   // clang-format off
   for (auto& f : lf)
     switch (f.kind) {
-      case category_field:     out << x.category_name;             
-                               std::cout << x.category_name;             break;
-      case class_name_field:   render_fun_prefix(out, x);          
-                               render_fun_prefix(std::cout, x);          break;
-      case date_field:         render_date(out, x.tstamp);         
-                               render_date(std::cout, x.tstamp);         break;
-      case file_field:         out << x.file_name;                 
-                               std::cout << x.file_name;                 break;
-      case line_field:         out << x.line_number;               
-                               std::cout << x.line_number;               break;
-      case message_field:      out << x.message;                   
-                               std::cout << x.message;                   break;
-      case method_field:       render_fun_name(out, x);            
-                               render_fun_name(std::cout, x);            break;
-      case newline_field:      out << std::endl;                   
-                               std::cout << std::endl;                   break;
-      case priority_field:     out << log_level_name[x.level];     
-                               std::cout << log_level_name[x.level];     break;
-      case runtime_field:      out << ms_time_diff(t0_, x.tstamp); 
-                               std::cout << ms_time_diff(t0_, x.tstamp); break;
-      case thread_field:       out << x.tid;                       
-                               std::cout << x.tid;                       break;
-      case actor_field:        out << actor_name;                  
-                               std::cout << actor_name;                  break;
-      case percent_sign_field: out << '%';                         
-                               std::cout << '%';                         break;
-      case plain_text_field:   out << f.text;                      
-                               std::cout << f.text;                      break;
+      case category_field:     out << x.category_name;             break;
+      case class_name_field:   render_fun_prefix(out, x);          break;
+      case date_field:         render_date(out, x.tstamp);         break;
+      case file_field:         out << x.file_name;                 break;
+      case line_field:         out << x.line_number;               break;
+      case message_field:      out << x.message;                   break;
+      case method_field:       render_fun_name(out, x);            break;
+      case newline_field:      out << std::endl;                   break;
+      case priority_field:     out << log_level_name[x.level];     break;
+      case runtime_field:      out << ms_time_diff(t0_, x.tstamp); break;
+      case thread_field:       out << x.tid;                       break;
+      case actor_field:        out << actor_name;                  break;
+      case percent_sign_field: out << '%';                         break;
+      case plain_text_field:   out << f.text;                      break;
       default: ; // nop
     }
   // clang-format on

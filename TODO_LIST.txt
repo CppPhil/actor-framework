@@ -1,3 +1,13 @@
+Implement vstamps as maps
+
+logger_id {
+    aid,
+    tid,
+    vid
+}
+
+map logger_ids to vector_timestamps
+
 entity {
     aid, // actor-id
     tid, // thread-id
@@ -5,7 +15,8 @@ entity {
     vid  // vector-id
 }
 
-map entities to vector_timestamps
+send sending entity along with that entities vector_timestamp
+on sending
 
 Only include the requiered entries in the vector timestamp
 

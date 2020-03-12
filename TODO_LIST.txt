@@ -1,3 +1,12 @@
+entity {
+    aid, // actor-id
+    tid, // thread-id
+    nid, // node-id
+    vid  // vector-id
+}
+
+map entities to vector_timestamps
+
 Only include the requiered entries in the vector timestamp
 
 Make it more like the custom_caf-vec application.

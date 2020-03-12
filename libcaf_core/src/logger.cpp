@@ -422,68 +422,56 @@ class monitor {
   decltype(auto) do_it(Invocable&& invocable) {
     std::lock_guard<std::mutex> lock_guard(mutex_);
     (void) lock_guard;
-    return std::invoke(std::forward<Invocable>(invocable), data_, name_,
-                       vector_timestamp_, thread_count_);
+    return std::invoke(std::forward<Invocable>(invocable));
   }
 
   template <class Invocable>
   decltype(auto) do_it(Invocable&& invocable) const {
     std::lock_guard<std::mutex> lock_guard(mutex_);
     (void) lock_guard;
-    return std::invoke(std::forward<Invocable>(invocable), data_, name_,
-                       vector_timestamp_, thread_count_);
+    return std::invoke(std::forward<Invocable>(invocable));
   }
 
 public:
   std::vector<size_t> accept(logger_id lid) {
-    return do_it([lid = std::move(lid)](auto& data, auto& name, auto& vstamp,
-                                        auto& thread_count) {
-      auto it = data.find(lid);
+    return do_it([this, lid = std::move(lid)] {
+      auto it = data_.find(lid);
 
-      if (it == data.end()) {
-        vstamp.push_back(0);
+      if (it == data_.end()) {
+        vector_timestamp_.push_back(0);
 
         if (lid.aid == 0)
-          name.push_back("thread" + std::to_string(++thread_count));
+          name_.push_back("thread" + std::to_string(++thread_count_));
         else
-          name.push_back("actor" + std::to_string(lid.aid));
+          name_.push_back("actor" + std::to_string(lid.aid));
 
-        auto [iter, always_true] = data.emplace(std::move(lid),
-                                                vstamp.size() - 1);
+        auto [iter, always_true] = data_.emplace(std::move(lid),
+                                                 vector_timestamp_.size() - 1);
         it = iter;
       }
 
       auto& [logger_id, vid] = *it;
-      ++vstamp.at(vid);
+      ++vector_timestamp_.at(vid);
 
-      return vstamp;
+      return vector_timestamp_;
     });
   }
 
   size_t vid(logger_id lid) const {
-    return do_it([&lid](const auto& data, [[maybe_unused]] const auto& name,
-                        [[maybe_unused]] const auto& vstamp,
-                        [[maybe_unused]] const auto& thread_count) {
-      auto it = data.find(lid);
-      assert(it != data.end());
+    return do_it([this, &lid] {
+      auto it = data_.find(lid);
+      assert(it != data_.end());
       const auto& [logger_id, vid] = *it;
       return vid;
     });
   }
 
   std::vector<size_t> get() const {
-    return do_it(
-      []([[maybe_unused]] const auto& data, [[maybe_unused]] const auto& name,
-         const auto& vstamp,
-         [[maybe_unused]] const auto& thread_count) { return vstamp; });
+    return do_it([this] { return vector_timestamp_; });
   }
 
   std::string name(size_t vid) const {
-    return do_it([vid]([[maybe_unused]] const auto& data, const auto& name,
-                       [[maybe_unused]] const auto& vstamp,
-                       [[maybe_unused]] const auto& thread_count) {
-      return name.at(vid);
-    });
+    return do_it([this, vid] { return name_.at(vid); });
   }
 
 private:

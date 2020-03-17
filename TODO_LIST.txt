@@ -1,4 +1,9 @@
+Merge remote CAF changes
+
+Implement vector_clocks like implementation.
+
 Implement vstamps as maps
+ -> map {aid, tid, nid} to logical clock
 
 logger_id {
     aid,

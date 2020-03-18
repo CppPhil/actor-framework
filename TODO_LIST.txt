@@ -1,3 +1,5 @@
+Figure out what data needs to be smuggled into the logger
+
 Implement vector_clocks like implementation.
 
 Implement vstamps as maps

@@ -1,5 +1,3 @@
-Merge remote CAF changes
-
 Implement vector_clocks like implementation.
 
 Implement vstamps as maps

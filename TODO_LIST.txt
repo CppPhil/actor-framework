@@ -2,6 +2,8 @@ data that needs to be smuggled into the logger
     vector_timestamp
     {aid, tid, nid}
 
+abstract_actor has a node() member function returning the node_id.
+
 Implement vector_clocks like implementation.
 
 Implement vstamps as maps

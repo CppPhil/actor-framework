@@ -1,4 +1,6 @@
-Figure out what data needs to be smuggled into the logger
+data that needs to be smuggled into the logger
+    vector_timestamp
+    {aid, tid, nid}
 
 Implement vector_clocks like implementation.
 
